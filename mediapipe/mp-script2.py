@@ -14,7 +14,7 @@ with mp_face_mesh.FaceMesh(
         refine_landmarks=True,
         min_detection_confidence=0.5) as face_mesh:
     
-    image = cv2.imread("test6.jpg")
+    image = cv2.imread("mask6.png")
     h, w, _ = image.shape
     results = face_mesh.process(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
     annotated_image = image.copy()
@@ -34,7 +34,7 @@ with mp_face_mesh.FaceMesh(
             x2, y2 = face_landmarks.landmark[jawline[i+1]].x*w,face_landmarks.landmark[jawline[i+1]].y*h
             cv2.line(annotated_image, (int(x1), int(y1)), (int(x2), int(y2)), (0, 0, 0), 2)
 
-    cv2.imwrite("mp4" + '.png', annotated_image)
+    cv2.imwrite("mp5" + '.png', annotated_image)
 
 
 

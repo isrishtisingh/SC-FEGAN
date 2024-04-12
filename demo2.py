@@ -22,9 +22,7 @@ class Ex(QWidget, Ui_Form):
         self.model.load_demo_graph(config)
 
         self.output_img = None
-
         self.mat_img = None
-
         self.ld_mask = None
         self.ld_sk = None
 
@@ -44,11 +42,13 @@ class Ex(QWidget, Ui_Form):
 
         self.dlg = QColorDialog(self.graphicsView)
         self.color = None
+    
 
     def mode_select(self, mode):
         for i in range(len(self.modes)):
             self.modes[i] = 0
         self.modes[mode] = 1
+
 
     def open(self):
         fileName, _ = QFileDialog.getOpenFileName(self, "Open File",
@@ -56,16 +56,14 @@ class Ex(QWidget, Ui_Form):
         if fileName:
             image = QPixmap(fileName)
             mat_img = cv2.imread(fileName)
-            print("\n************************************\n")
-            print("Input image: ", mat_img.shape)
+            print("Mat image1: ", mat_img.shape)
+            mat_img = cv2.imread("exp1/image1.jpg")
+            print("Mat image2: ", mat_img.shape)
             if image.isNull():
                 QMessageBox.information(self, "Image Viewer",
                         "Cannot load %s." % fileName)
                 return
-
-            # redbrush = QBrush(Qt.red)
-            # blackpen = QPen(Qt.black)
-            # blackpen.setWidth(5)
+            
             self.image = image.scaled(self.graphicsView.size(), Qt.IgnoreAspectRatio)
             mat_img = cv2.resize(mat_img, (512, 512), interpolation=cv2.INTER_CUBIC)
             mat_img = mat_img/127.5 - 1
@@ -97,38 +95,22 @@ class Ex(QWidget, Ui_Form):
         self.scene.get_stk_color(self.color)
 
     def complete(self):
-        sketch = self.make_sketch(self.scene.sketch_points)
-        stroke = self.make_stroke(self.scene.stroke_points)
-        mask = self.make_mask(self.scene.mask_points)
-        # print("sketch, stroke, mask, : ", sketch, stroke, mask)
-        if not type(self.ld_mask)==type(None):
-            ld_mask = np.expand_dims(self.ld_mask[:,:,0:1],axis=0)
-            ld_mask[ld_mask>0] = 1
-            ld_mask[ld_mask<1] = 0
-            mask = mask+ld_mask
-            mask[mask>0] = 1
-            mask[mask<1] = 0
-            mask = np.asarray(mask,dtype=np.uint8)
-            print(mask.shape)
-
-        if not type(self.ld_sk)==type(None):
-            sketch = sketch+self.ld_sk
-            sketch[sketch>0]=1 
-
+        # Generate the output image
+        sketch = self.make_sketch(None)
+        stroke = self.make_stroke(None)
+        mask = self.make_mask(None)
         noise = self.make_noise()
-
         sketch = sketch*mask
         stroke = stroke*mask
         noise = noise*mask
-
-        print("Shape of sketch, stroke, mask, noise, org_img: ",sketch.shape, stroke.shape, mask.shape, noise.shape, self.mat_img.shape)
-
+        org_img = self.mat_img
+        print("Shape of sketch, stroke, mask, noise, org_img: ",sketch.shape, stroke.shape, mask.shape, noise.shape, org_img)
         batch = np.concatenate(
                     [self.mat_img,
-                     sketch,
-                     stroke,
-                     mask,
-                     noise],axis=3)
+                    sketch,
+                    stroke,
+                    mask,
+                    noise],axis=3)
         start_t = time.time()
         result = self.model.demo(self.config, batch)
         end_t = time.time()
@@ -141,6 +123,7 @@ class Ex(QWidget, Ui_Form):
         self.result_scene.removeItem(self.result_scene.items()[-1])
         self.result_scene.addPixmap(QPixmap.fromImage(qim))
 
+    
     def make_noise(self):
         noise = np.zeros([512, 512, 1],dtype=np.uint8)
         noise = cv2.randn(noise, 0, 255)
@@ -150,55 +133,34 @@ class Ex(QWidget, Ui_Form):
         return noise
 
     def make_mask(self, pts):
-        if len(pts)>0:
-            mask = np.zeros((512,512,3))
-            for pt in pts:
-                cv2.line(mask,pt['prev'],pt['curr'],(255,255,255),12)
-            mask = np.asarray(mask[:,:,0]/255,dtype=np.uint8)
-            mask = np.expand_dims(mask,axis=2)
-            mask = np.expand_dims(mask,axis=0)
-        else:
-            mask = np.zeros((512,512,3))
-            mask = np.asarray(mask[:,:,0]/255,dtype=np.uint8)
-            mask = np.expand_dims(mask,axis=2)
-            mask = np.expand_dims(mask,axis=0)
+        # Load the mask image
+        mask = cv2.imread("exp1/mask1.png", cv2.IMREAD_GRAYSCALE)
+        mask = cv2.resize(mask, (512, 512), interpolation=cv2.INTER_CUBIC)
+        mask = np.asarray(mask/255, dtype=np.uint8)
+        mask = np.expand_dims(mask, axis=2)
+        mask = np.expand_dims(mask, axis=0)
         print("Mask shape: ",mask.shape)
         return mask
 
     def make_sketch(self, pts):
-        if len(pts)>0:
-            sketch = np.zeros((512,512,3))
-            # sketch = 255*sketch
-            for pt in pts:
-                cv2.line(sketch,pt['prev'],pt['curr'],(255,255,255),1)
-            sketch = np.asarray(sketch[:,:,0]/255,dtype=np.uint8)
-            sketch = np.expand_dims(sketch,axis=2)
-            sketch = np.expand_dims(sketch,axis=0)
-        else:
-            sketch = np.zeros((512,512,3))
-            # sketch = 255*sketch
-            sketch = np.asarray(sketch[:,:,0]/255,dtype=np.uint8)
-            sketch = np.expand_dims(sketch,axis=2)
-            sketch = np.expand_dims(sketch,axis=0)
+        # Load the sketch image
+        sketch = cv2.imread("exp1/sketch1.png", cv2.IMREAD_GRAYSCALE)
+        sketch = cv2.resize(sketch, (512, 512), interpolation=cv2.INTER_CUBIC)
+        sketch = np.asarray(sketch/255, dtype=np.uint8)
+        sketch = np.expand_dims(sketch, axis=2)
+        sketch = np.expand_dims(sketch, axis=0)
         print("Sketch shape: ",sketch.shape)
         return sketch
 
     def make_stroke(self, pts):
-        if len(pts)>0:
-            stroke = np.zeros((512,512,3))
-            for pt in pts:
-                c = pt['color'].lstrip('#')
-                color = tuple(int(c[i:i+2], 16) for i in (0, 2 ,4))
-                color = (color[2],color[1],color[0])
-                cv2.line(stroke,pt['prev'],pt['curr'],color,4)
-            stroke = stroke/127.5 - 1
-            stroke = np.expand_dims(stroke,axis=0)
-        else:
-            stroke = np.zeros((512,512,3))
-            stroke = stroke/127.5 - 1
-            stroke = np.expand_dims(stroke,axis=0)
+        # Load the stroke image
+        stroke = cv2.imread("exp1/stroke1.png")
+        stroke = cv2.resize(stroke, (512, 512), interpolation=cv2.INTER_CUBIC)
+        stroke = stroke/127.5 - 1
+        stroke = np.expand_dims(stroke, axis=0)
         print("Stroke shape: ",stroke.shape)
         return stroke
+
 
     def arrange(self):
         image = np.asarray((self.mat_img[0]+1)*127.5,dtype=np.uint8)
